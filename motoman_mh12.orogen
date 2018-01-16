@@ -2,17 +2,15 @@ name "motoman_mh12"
 # Optionally declare the version number
 version "0.1"
 
+using_task_library 'iodrivers_base'
+
 import_types_from "std"
 import_types_from "base"
 
-# Declare a new task context (i.e., a component)
-#
-# The corresponding C++ class can be edited in tasks/Task.hpp and
-# tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
-task_context "TrajectoryFollowTask" do
-    needs_configuration
+using_library "motoman_mh12"
 
-    property "period", "/base/Time"
+task_context "TrajectoryFollowTask" do
+    subclasses "iodrivers_base::Task"
 
     # The trajectory
     input_port "trajectory", "/base/JointsTrajectory"
@@ -22,4 +20,6 @@ task_context "TrajectoryFollowTask" do
 
     # The given trajectory's first time is not null
     exception_states :TRAJECTORY_START_TIME_NON_NULL
+
+    port_driven 'trajectory'
 end

@@ -4,6 +4,7 @@
 #define MOTOMAN_MH12_TRAJECTORYFOLLOWTASK_TASK_HPP
 
 #include "motoman_mh12/TrajectoryFollowTaskBase.hpp"
+#include <motoman_mh12/Driver.hpp>
 
 namespace motoman_mh12{
 
@@ -28,6 +29,8 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
     {
 	friend class TrajectoryFollowTaskBase;
     protected:
+        void processIO();
+        Driver* mDriver;
 
 
 
@@ -47,7 +50,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
 
         /** Default deconstructor of TrajectoryFollowTask
          */
-	~TrajectoryFollowTask();
+	    ~TrajectoryFollowTask();
 
         /** This hook is called by Orocos when the state machine transitions
          * from PreOperational to Stopped. If it returns false, then the
@@ -110,4 +113,3 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
 }
 
 #endif
-

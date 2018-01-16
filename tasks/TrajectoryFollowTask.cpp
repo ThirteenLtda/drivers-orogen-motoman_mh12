@@ -26,10 +26,24 @@ TrajectoryFollowTask::~TrajectoryFollowTask()
 
 bool TrajectoryFollowTask::configureHook()
 {
+    Driver* driver = new Driver();
+    if (!_io_port.get().empty())
+        driver->openURI(_io_port.get());
+    setDriver(driver);
+    mDriver = driver;
+
     if (! TrajectoryFollowTaskBase::configureHook())
         return false;
     return true;
 }
+
+
+void TrajectoryFollowTask::processIO()
+{
+
+}
+
+
 bool TrajectoryFollowTask::startHook()
 {
     if (! TrajectoryFollowTaskBase::startHook())
@@ -46,9 +60,13 @@ void TrajectoryFollowTask::errorHook()
 }
 void TrajectoryFollowTask::stopHook()
 {
+    mDriver->close();
     TrajectoryFollowTaskBase::stopHook();
 }
 void TrajectoryFollowTask::cleanupHook()
 {
     TrajectoryFollowTaskBase::cleanupHook();
+    setDriver(0);
+    delete mDriver;
+    mDriver = 0;
 }
