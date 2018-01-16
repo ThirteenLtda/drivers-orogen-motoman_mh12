@@ -1,6 +1,7 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.cpp */
 
 #include "TrajectoryFollowTask.hpp"
+#include <motoman_mh12/Msgs.hpp>
 
 using namespace motoman_mh12;
 
@@ -48,11 +49,41 @@ bool TrajectoryFollowTask::startHook()
 {
     if (! TrajectoryFollowTaskBase::startHook())
         return false;
+
+    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
+    //TODO check reply
     return true;
 }
 void TrajectoryFollowTask::updateHook()
 {
     TrajectoryFollowTaskBase::updateHook();
+    base::JointsTrajectory trajectory;
+    _trajectory.read(trajectory);
+
+    if (!trajectory.isValid())
+    {
+        exception(INVALID_TRAJECTORY);
+        throw std::runtime_error("received invalid trajectory");
+    }
+    else if (!trajectory.times.empty() && !trajectory.times[0].isNull())
+    {
+        exception(TRAJECTORY_START_TIME_NON_NULL);
+        throw std::runtime_error("received trajectory with a non-null start time");
+    }
+
+    base::samples::Joints joints;
+    base::Time time;
+    msgs::MotionReply reply;
+    reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::CHECK_MOTION_READY);
+    //TODO check reply
+    std::vector<base::JointState> current_position;
+
+    for(int step = 0; step < trajectory.getTimeSteps(); step++){
+        trajectory.getJointsAtTimeStep(step, joints);
+        joints.time = trajectory.times[step];
+        reply = mDriver->sendJointTrajPTFullCmd(0, step, joints);
+        // TODO check reply
+    }
 }
 void TrajectoryFollowTask::errorHook()
 {
