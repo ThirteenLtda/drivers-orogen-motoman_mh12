@@ -2,12 +2,12 @@
   <description brief="Trajectory follower for motoman MH12">
   
   </description>
-  <author>eduardo.elael@13robotics.com/Eduardo Elael</author>
+  <author>Eduardo Elael/eduardo.elael@13robotics.com</author>
+  <!--
   <license></license>
   <url>http://</url>
   <logo>http://</logo>
   <depend package="base/cmake" />
-  <!--
    To add any dependencies use the depend tag
   <depend package="dummy-dependency-0" />
 	...
