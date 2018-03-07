@@ -9,7 +9,7 @@ import_types_from "base"
 
 using_library "motoman_mh12"
 
-task_context "TrajectoryFollowTask" do
+task_context "WriterTask" do
     subclasses "iodrivers_base::Task"
 
     # The trajectory

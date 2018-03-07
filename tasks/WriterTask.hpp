@@ -3,12 +3,12 @@
 #ifndef MOTOMAN_MH12_TRAJECTORYFOLLOWTASK_TASK_HPP
 #define MOTOMAN_MH12_TRAJECTORYFOLLOWTASK_TASK_HPP
 
-#include "motoman_mh12/TrajectoryFollowTaskBase.hpp"
+#include "motoman_mh12/WriterTaskBase.hpp"
 #include <motoman_mh12/Driver.hpp>
 
 namespace motoman_mh12{
 
-    /*! \class TrajectoryFollowTask
+    /*! \class WriterTask
      * \brief The task context provides and requires services. It uses an ExecutionEngine to perform its functions.
      * Essential interfaces are operations, data flow ports and properties. These interfaces have been defined using the oroGen specification.
      * In order to modify the interfaces you should (re)use oroGen and rely on the associated workflow.
@@ -20,14 +20,14 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
      * The name of a TaskContext is primarily defined via:
      \verbatim
      deployment 'deployment_name'
-         task('custom_task_name','motoman_mh12::TrajectoryFollowTask')
+         task('custom_task_name','motoman_mh12::WriterTask')
      end
      \endverbatim
      *  It can be dynamically adapted when the deployment is called with a prefix argument.
      */
-    class TrajectoryFollowTask : public TrajectoryFollowTaskBase
+    class WriterTask : public WriterTaskBase
     {
-	friend class TrajectoryFollowTaskBase;
+	friend class WriterTaskBase;
     protected:
         void processIO();
         Driver* mDriver;
@@ -35,22 +35,22 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
 
 
     public:
-        /** TaskContext constructor for TrajectoryFollowTask
+        /** TaskContext constructor for WriterTask
          * \param name Name of the task. This name needs to be unique to make it identifiable via nameservices.
          * \param initial_state The initial TaskState of the TaskContext. Default is Stopped state.
          */
-        TrajectoryFollowTask(std::string const& name = "motoman_mh12::TrajectoryFollowTask");
+        WriterTask(std::string const& name = "motoman_mh12::WriterTask");
 
-        /** TaskContext constructor for TrajectoryFollowTask
+        /** TaskContext constructor for WriterTask
          * \param name Name of the task. This name needs to be unique to make it identifiable for nameservices.
          * \param engine The RTT Execution engine to be used for this task, which serialises the execution of all commands, programs, state machines and incoming events for a task.
          * 
          */
-        TrajectoryFollowTask(std::string const& name, RTT::ExecutionEngine* engine);
+        WriterTask(std::string const& name, RTT::ExecutionEngine* engine);
 
-        /** Default deconstructor of TrajectoryFollowTask
+        /** Default deconstructor of WriterTask
          */
-	    ~TrajectoryFollowTask();
+	    ~WriterTask();
 
         /** This hook is called by Orocos when the state machine transitions
          * from PreOperational to Stopped. If it returns false, then the

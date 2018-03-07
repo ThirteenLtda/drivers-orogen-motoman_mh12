@@ -1,31 +1,31 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.cpp */
 
-#include "TrajectoryFollowTask.hpp"
+#include "WriterTask.hpp"
 #include <motoman_mh12/Msgs.hpp>
 
 using namespace motoman_mh12;
 
-TrajectoryFollowTask::TrajectoryFollowTask(std::string const& name)
-    : TrajectoryFollowTaskBase(name)
+WriterTask::WriterTask(std::string const& name)
+    : WriterTaskBase(name)
 {
 }
 
-TrajectoryFollowTask::TrajectoryFollowTask(std::string const& name, RTT::ExecutionEngine* engine)
-    : TrajectoryFollowTaskBase(name, engine)
+WriterTask::WriterTask(std::string const& name, RTT::ExecutionEngine* engine)
+    : WriterTaskBase(name, engine)
 {
 }
 
-TrajectoryFollowTask::~TrajectoryFollowTask()
+WriterTask::~WriterTask()
 {
 }
 
 
 
 /// The following lines are template definitions for the various state machine
-// hooks defined by Orocos::RTT. See TrajectoryFollowTask.hpp for more detailed
+// hooks defined by Orocos::RTT. See WriterTask.hpp for more detailed
 // documentation about them.
 
-bool TrajectoryFollowTask::configureHook()
+bool WriterTask::configureHook()
 {
     Driver* driver = new Driver();
     if (!_io_port.get().empty())
@@ -33,30 +33,30 @@ bool TrajectoryFollowTask::configureHook()
     setDriver(driver);
     mDriver = driver;
 
-    if (! TrajectoryFollowTaskBase::configureHook())
+    if (! WriterTaskBase::configureHook())
         return false;
     return true;
 }
 
 
-void TrajectoryFollowTask::processIO()
+void WriterTask::processIO()
 {
 
 }
 
 
-bool TrajectoryFollowTask::startHook()
+bool WriterTask::startHook()
 {
-    if (! TrajectoryFollowTaskBase::startHook())
+    if (! WriterTaskBase::startHook())
         return false;
 
     msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
     //TODO check reply
     return true;
 }
-void TrajectoryFollowTask::updateHook()
+void WriterTask::updateHook()
 {
-    TrajectoryFollowTaskBase::updateHook();
+    WriterTaskBase::updateHook();
     base::JointsTrajectory trajectory;
     _trajectory.read(trajectory);
 
@@ -85,18 +85,18 @@ void TrajectoryFollowTask::updateHook()
         // TODO check reply
     }
 }
-void TrajectoryFollowTask::errorHook()
+void WriterTask::errorHook()
 {
-    TrajectoryFollowTaskBase::errorHook();
+    WriterTaskBase::errorHook();
 }
-void TrajectoryFollowTask::stopHook()
+void WriterTask::stopHook()
 {
     mDriver->close();
-    TrajectoryFollowTaskBase::stopHook();
+    WriterTaskBase::stopHook();
 }
-void TrajectoryFollowTask::cleanupHook()
+void WriterTask::cleanupHook()
 {
-    TrajectoryFollowTaskBase::cleanupHook();
+    WriterTaskBase::cleanupHook();
     setDriver(0);
     delete mDriver;
     mDriver = 0;
