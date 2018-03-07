@@ -8,7 +8,38 @@ import_types_from "std"
 import_types_from "base"
 
 using_library "motoman_mh12"
+import_types_from "motoman_mh12/Msgs.hpp"
+# The controller opens two ports, one is responsible to stream status of the robot,
+# as well joint feedback information. This is addressed here by the ReaderTask. 
+# The other port is where is possible to send commands to the controller, which 
+# sends back acknowledge messages with the response to each cmd. The WriterTask is, 
+# then, responsible for the interaction with the controller. To more information
+# about the protocol please refer to:
+# [http://wiki.ros.org/motoman_driver?action=AttachFile&do=view&target=MotoRos_EDS.pdf]
 
+
+# Besides the protocol stated on the mentioned documentation, there is a few 
+# behavior worth to be noted when using the controller.
+#
+# * There is no buffer for commands. A motion message’s trajectory command is 
+#   broken down into incmoves (incremental motion segments) that match the controller 
+#   interpolation period. There is a buffer of size 200 for incmoves. If the buffer 
+#   gets filled, the processing fucntion gets blocked while trying to send new 
+#   incmoves to the buffer and rejects all incoming motion messages (Busy reply code).
+#   In practice, that means trajectory points with close timestamps can be sent 
+#   more frequently than more spaced ones (they are broken into fewer incmoves).
+# * After a stop motion, a new trajectory must be restarted at all means. If 
+#   this requirement is not fulfilled, the controlle continues as the same trajectory, 
+#   but as incremental motion. It takes the absolute commands and works by the 
+#   difference between them, leading to totally wrong positions.
+# * Sequence numbers do not need to be incremental. The sequence 0 is (and can
+#   only be) the starting of the trajectory. Negative sequence numbers are invalid 
+#   and its command is completely ignored, continuing to the next command.
+# * The timestamp in the trajectory points increase monotonically. If this is 
+#   not followed the controller ignores the point, but returns success as response 
+#   to the command. What can mislead to wrong assumptions.
+# * There is no timeout between two consecutives points in the same trajectory. 
+#   If one stop sending points, the controller will stop the manipulator. 
 task_context "WriterTask" do
     subclasses "iodrivers_base::Task"
 
@@ -23,3 +54,15 @@ task_context "WriterTask" do
 
     port_driven 'trajectory'
 end
+
+task_context "ReaderTask" do
+    subclasses "iodrivers_base::Task"
+    
+    needs_configuration
+    
+    output_port "status", "motoman_mh12/msgs/MotomanStatus"
+    output_port "joints", "base/samples/Joints"
+    
+    periodic 0.1
+end
+
