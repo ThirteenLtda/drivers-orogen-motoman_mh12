@@ -40,8 +40,7 @@ import_types_from "motoman_mh12/Msgs.hpp"
 #   to the command. What can mislead to wrong assumptions.
 # * There is no timeout between two consecutives points in the same trajectory. 
 #   If one stop sending points, the controller will stop the manipulator. 
-task_context "WriterTask" do
-    subclasses "iodrivers_base::Task"
+task_context "WriterTask", subclasses: "iodrivers_base::Task" do
 
     # The trajectory
     input_port "trajectory", "/base/JointsTrajectory"
@@ -55,8 +54,7 @@ task_context "WriterTask" do
     port_driven 'trajectory'
 end
 
-task_context "ReaderTask" do
-    subclasses "iodrivers_base::Task"
+task_context "ReaderTask", subclasses: "iodrivers_base::Task" do
     
     needs_configuration
     
