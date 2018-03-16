@@ -78,7 +78,7 @@ void WriterTask::updateHook()
     //TODO check reply
     std::vector<base::JointState> current_position;
 
-    for(int step = 0; step < trajectory.getTimeSteps(); step++){
+    for(size_t step = 0; step < trajectory.getTimeSteps(); step++){
         trajectory.getJointsAtTimeStep(step, joints);
         joints.time = trajectory.times[step];
         reply = mDriver->sendJointTrajPTFullCmd(0, step, joints);
