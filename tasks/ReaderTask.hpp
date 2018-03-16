@@ -30,7 +30,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12_streamer namespace.
 	friend class ReaderTaskBase;
     protected:
 
-        Driver driver;
+        Driver* mDriver;
 
     public:
         /** TaskContext constructor for Task

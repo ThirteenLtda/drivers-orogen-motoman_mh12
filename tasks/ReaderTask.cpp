@@ -50,19 +50,19 @@ void ReaderTask::updateHook()
 
 void ReaderTask::processIO()
 {
-    msgs::MotomanMsgType msg_type =  driver.read(); 
-    if(msg_type == msgs::MOTOMAN_JOINT_FEEDBACK)
+    msgs::MotomanMsgType msg_type =  mDriver->read(_io_read_timeout.get()); 
+    if (msg_type == msgs::MOTOMAN_ROBOT_STATUS)
     {
-        msgs::MotomanJointFeedback joint_feedback = driver.getJointFeedback();
+        msgs::MotomanStatus status = mDriver->getRobotStatus();
+        _status.write(status);
+    }
+    else if(msg_type == msgs::MOTOMAN_JOINT_FEEDBACK)
+    {
+        msgs::MotomanJointFeedback joint_feedback = mDriver->getJointFeedback();
         base::samples::Joints joints;
         joints.elements = joint_feedback.joint_states;
         joints.time = joint_feedback.time;
         _joints.write(joints);
-    }
-    else if (msg_type == msgs::MOTOMAN_ROBOT_STATUS)
-    {
-        msgs::MotomanStatus status = driver.getRobotStatus();
-        _status.write(0);
     }
 }
 void ReaderTask::errorHook()
