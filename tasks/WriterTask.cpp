@@ -113,6 +113,7 @@ void WriterTask::errorHook()
 }
 void WriterTask::stopHook()
 {
+    while(mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::STOP_MOTION).result != msgs::motion_reply::MotionReplyResults::SUCCESS){};
     mDriver->close();
     WriterTaskBase::stopHook();
 }
