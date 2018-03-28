@@ -31,6 +31,8 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
     protected:
         void processIO();
         Driver* mDriver;
+        base::JointsTrajectory current_trajectory;
+        size_t current_step;
 
 
 
