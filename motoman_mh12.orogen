@@ -51,6 +51,14 @@ task_context "WriterTask", subclasses: "iodrivers_base::Task" do
     # The given trajectory's first time is not null
     exception_states :TRAJECTORY_START_TIME_NON_NULL
 
+    # Motion readiness could not be validated
+    exception_states :MOTION_NOT_READY
+
+    # Failed while trying to send a trajectory command
+    exception_states :TRAJECTORY_CMD_ERROR
+
+    reports :TRAJECTORY_END
+
     port_driven 'trajectory'
 end
 
