@@ -60,6 +60,7 @@ void ReaderTask::processIO()
     {
         msgs::MotomanJointFeedback joint_feedback = mDriver->getJointFeedback();
         base::samples::Joints joints;
+        joint_feedback.joint_states.resize(6);
         joints.elements = joint_feedback.joint_states;
         joints.time = joint_feedback.time;
         _joints.write(joints);
