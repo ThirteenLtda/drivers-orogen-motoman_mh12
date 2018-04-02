@@ -2,6 +2,7 @@
 
 #include "ReaderTask.hpp"
 #include <base/commands/Joints.hpp>
+#include <iodrivers_base/ConfigureGuard.hpp>
 
 using namespace motoman_mh12;
 
@@ -24,7 +25,8 @@ ReaderTask::~ReaderTask()
 // documentation about them.
 
 bool ReaderTask::configureHook()
-{
+{   
+    iodrivers_base::ConfigureGuard guard(this);
     Driver* driver = new Driver();
     if (!_io_port.get().empty())
         driver->openURI(_io_port.get());
@@ -33,7 +35,8 @@ bool ReaderTask::configureHook()
     
     if (!TaskBase::configureHook())
         return false;
-
+    
+    guard.commit();
     return true;
 }
 bool ReaderTask::startHook()

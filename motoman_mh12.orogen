@@ -59,7 +59,7 @@ task_context "WriterTask", subclasses: "iodrivers_base::Task" do
 
     reports :TRAJECTORY_END
 
-    port_driven 'trajectory'
+    periodic 0.1
 end
 
 task_context "ReaderTask", subclasses: "iodrivers_base::Task" do

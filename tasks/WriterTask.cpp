@@ -2,6 +2,7 @@
 
 #include "WriterTask.hpp"
 #include <motoman_mh12/Msgs.hpp>
+#include <iodrivers_base/ConfigureGuard.hpp>
 
 using namespace motoman_mh12;
 
@@ -27,6 +28,7 @@ WriterTask::~WriterTask()
 
 bool WriterTask::configureHook()
 {
+    iodrivers_base::ConfigureGuard guard(this);
     Driver* driver = new Driver();
     if (!_io_port.get().empty())
         driver->openURI(_io_port.get());
@@ -35,6 +37,8 @@ bool WriterTask::configureHook()
 
     if (! WriterTaskBase::configureHook())
         return false;
+    
+    guard.commit();
     return true;
 }
 
@@ -52,6 +56,7 @@ bool WriterTask::startHook()
 
     msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
     //TODO check reply
+    running = false;
     return true;
 }
 void WriterTask::updateHook()
@@ -59,41 +64,35 @@ void WriterTask::updateHook()
     WriterTaskBase::updateHook();
     //if buffer not empty:
     // if time ==0 : current_step = 0
-
-    if( current_step == current_trajectory.getTimeSteps())
+    if(!running)
     {
-        base::JointsTrajectory trajectory;
-        if( !(_trajectory.read(trajectory) == RTT::NewData) )
+        if( !(_trajectory.read(current_trajectory) == RTT::NewData) )
             return;
-        if (!trajectory.isValid())
+        if (!current_trajectory.isValid())
         {
             exception(INVALID_TRAJECTORY);
             throw std::runtime_error("received invalid trajectory");
         }
-        else if (!trajectory.times.empty() && !trajectory.times[0].isNull())
+        else if (!current_trajectory.times.empty() && !current_trajectory.times[0].isNull())
         {
             exception(TRAJECTORY_START_TIME_NON_NULL);
             throw std::runtime_error("received trajectory with a non-null start time");
         }
+        running = true;
+        current_step = 0;
+        std::cout << "NUMBER OF POINTS: " << current_trajectory.getTimeSteps() << std::endl;
     }
 
-    msgs::MotionReply reply;
-    reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::CHECK_MOTION_READY);
-    if(reply.result != msgs::motion_reply::MotionReplyResults::SUCCESS)
-    {
-        RTT::log(RTT::Error) << "CHECK_MOTION_READY returned " << reply.result << " for command " << reply.command << RTT::endlog();
-        exception(MOTION_NOT_READY);
-        throw std::runtime_error("CHECK_MOTION_READY does not returned SUCCESS  ");
-    }
-    
     base::samples::Joints joints;
     for(; current_step < current_trajectory.getTimeSteps(); current_step++)
     {
         current_trajectory.getJointsAtTimeStep(current_step, joints);
         joints.time = current_trajectory.times[current_step];
-        reply = mDriver->sendJointTrajPTFullCmd(0, current_step, joints);
+        msgs::MotionReply reply = mDriver->sendJointTrajPTFullCmd(0, current_step, joints);
         if (reply.result == msgs::motion_reply::MotionReplyResults::BUSY)
+        {
             return;
+        }
 
         if(reply.result != msgs::motion_reply::MotionReplyResults::SUCCESS)
         {
@@ -101,11 +100,13 @@ void WriterTask::updateHook()
             exception(TRAJECTORY_CMD_ERROR);
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
+        else
     }
-    reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
+
+    running = false;
+    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
         report(TRAJECTORY_END);
-
 }
 void WriterTask::errorHook()
 {
