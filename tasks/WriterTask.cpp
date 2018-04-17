@@ -100,7 +100,6 @@ void WriterTask::updateHook()
             exception(TRAJECTORY_CMD_ERROR);
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
-        else
     }
 
     running = false;
