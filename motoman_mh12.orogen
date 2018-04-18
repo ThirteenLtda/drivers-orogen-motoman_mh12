@@ -9,6 +9,7 @@ import_types_from "base"
 
 using_library "motoman_mh12"
 import_types_from "motoman_mh12/Msgs.hpp"
+import_types_from "motoman_mh12Types.hpp"
 # The controller opens two ports, one is responsible to stream status of the robot,
 # as well joint feedback information. This is addressed here by the ReaderTask. 
 # The other port is where is possible to send commands to the controller, which 
@@ -42,9 +43,11 @@ import_types_from "motoman_mh12/Msgs.hpp"
 #   If one stop sending points, the controller will stop the manipulator. 
 task_context "WriterTask", subclasses: "iodrivers_base::Task" do
 
+    property "gpios_addresses", "std/vector<int>"
     # The trajectory
     input_port "trajectory", "/base/JointsTrajectory"
     input_port "status", "motoman_mh12/msgs/MotomanStatus"
+    output_port "gpios", "motoman_mh12/GPIOs"
 
     # The trajectory is invalid
     exception_states :INVALID_TRAJECTORY

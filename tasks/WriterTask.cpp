@@ -168,6 +168,20 @@ void WriterTask::executeTrajectory()
         report(TRAJECTORY_END);
 }
 
+void WriterTask::readGPIO()
+{
+    GPIOs gpios;
+    for(size_t i; i<_gpios_addresses.get().size(); i++)
+    {
+        msgs::ReadSingleIo single_io = mDriver->queryReadSingleIO(_gpios_addresses.get()[i]);
+        GPIO current_gpio;
+        current_gpio.address = _gpios_addresses.get()[i];
+        current_gpio.value = single_io.value;
+        gpios.ports.push_back(current_gpio);
+    }
+    gpios.timestamp= base::Time::now();
+    _gpios.write(gpios);
+}
 
 void WriterTask::updateHook()
 {
@@ -191,6 +205,7 @@ void WriterTask::updateHook()
             stopTrajectory();
             break;
     }
+    readGPIO();
 }
 
 void WriterTask::errorHook()
