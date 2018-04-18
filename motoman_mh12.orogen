@@ -44,6 +44,7 @@ task_context "WriterTask", subclasses: "iodrivers_base::Task" do
 
     # The trajectory
     input_port "trajectory", "/base/JointsTrajectory"
+    input_port "status", "motoman_mh12/msgs/MotomanStatus"
 
     # The trajectory is invalid
     exception_states :INVALID_TRAJECTORY
@@ -56,8 +57,15 @@ task_context "WriterTask", subclasses: "iodrivers_base::Task" do
 
     # Failed while trying to send a trajectory command
     exception_states :TRAJECTORY_CMD_ERROR
+    
+    # There is at least one alarm on 
+    exception_states :ALARM_ERROR
+
+    # Pedant is not on remote mode
+    exception_states :PENDANT_MODE_ERROR
 
     reports :TRAJECTORY_END
+    runtime_states  :NOT_CHECKED,:STATUS_CHECKED, :MOTION_READY, :TRAJECTORY_EXECUTION
 
     periodic 0.1
 end

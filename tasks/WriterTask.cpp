@@ -3,6 +3,7 @@
 #include "WriterTask.hpp"
 #include <motoman_mh12/Msgs.hpp>
 #include <iodrivers_base/ConfigureGuard.hpp>
+#include <base/Timeout.hpp>
 
 using namespace motoman_mh12;
 
@@ -19,8 +20,6 @@ WriterTask::WriterTask(std::string const& name, RTT::ExecutionEngine* engine)
 WriterTask::~WriterTask()
 {
 }
-
-
 
 /// The following lines are template definitions for the various state machine
 // hooks defined by Orocos::RTT. See WriterTask.hpp for more detailed
@@ -54,35 +53,95 @@ bool WriterTask::startHook()
     if (! WriterTaskBase::startHook())
         return false;
 
-    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
-    //TODO check reply
-    running = false;
+    state(NOT_CHECKED);
     return true;
 }
-void WriterTask::updateHook()
+
+void WriterTask::checkInitialStatus()
 {
-    WriterTaskBase::updateHook();
-    //if buffer not empty:
-    // if time ==0 : current_step = 0
-    if(!running)
+   msgs::MotomanStatus status;
+   if(_status.read(status) == RTT::NewData) 
+   {
+        if(status.ln_error != 0)
+        {
+            exception(ALARM_ERROR);
+            RTT::log(RTT::Error) << "Alarm with code " << 
+                status.error_code << " is on" << RTT::endlog();
+            exception(ALARM_ERROR);
+            throw std::runtime_error("Alarm on, to enable the robot please reset it"); 
+        }
+        if(status.mode != 0)
+        {
+            RTT::log(RTT::Error) << "Pendant is not on remote mode, please turn key to the correct mode"
+                << RTT::endlog();
+            exception(PENDANT_MODE_ERROR);
+            throw;
+        }
+        state(STATUS_CHECKED);
+   }
+}
+
+void WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
+{
+    base::Timeout deadline(timeout);
+    while(!deadline.elapsed())
     {
-        if( !(_trajectory.read(current_trajectory) == RTT::NewData) )
+        msgs::MotionReply stop_reply = mDriver
+            ->sendMotionCtrl(0, 0, cmd);
+        if(stop_reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS)
             return;
-        if (!current_trajectory.isValid())
+    }            
+}
+
+void WriterTask::stopTrajectory()
+{
+    base::Time timeout = base::Time::fromSeconds(1);
+    sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_MOTION);
+    sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_TRAJ_MODE);
+    state(NOT_CHECKED);
+}
+
+void WriterTask::startTrajectoryMode()
+{
+    base::Time timeout = base::Time::fromSeconds(1);
+    sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
+    msgs::MotomanStatus status;
+   if(_status.read(status) == RTT::NewData) 
+   {
+        if(status.motion_possible == 1 && status.drives_powered == 1)
+            state(MOTION_READY);
+   }
+}
+
+void WriterTask::readNewTrajectory()
+{
+    base::JointsTrajectory temp_trajectory;
+    RTT::FlowStatus incoming_data = _trajectory.read(temp_trajectory);
+
+    if(incoming_data == RTT::NoData)
+    {
+        stopTrajectory(); 
+        return;
+    } else if (incoming_data == RTT::NewData)
+    {
+        if(!temp_trajectory.isValid())
         {
             exception(INVALID_TRAJECTORY);
-            throw std::runtime_error("received invalid trajectory");
-        }
-        else if (!current_trajectory.times.empty() && !current_trajectory.times[0].isNull())
+            return;
+        } else if (!temp_trajectory.times.empty() && !temp_trajectory.times[0].isNull())
         {
             exception(TRAJECTORY_START_TIME_NON_NULL);
-            throw std::runtime_error("received trajectory with a non-null start time");
+            return;
         }
-        running = true;
+        current_trajectory = temp_trajectory;
+        startTrajectoryMode();
         current_step = 0;
-        std::cout << "NUMBER OF POINTS: " << current_trajectory.getTimeSteps() << std::endl;
+        state(TRAJECTORY_EXECUTION);
     }
+}
 
+void WriterTask::executeTrajectory()
+{
     base::samples::Joints joints;
     for(; current_step < current_trajectory.getTimeSteps(); current_step++)
     {
@@ -96,24 +155,51 @@ void WriterTask::updateHook()
 
         if(reply.result != msgs::motion_reply::MotionReplyResults::SUCCESS)
         {
-            RTT::log(RTT::Error) << "Trajectory command returned " << reply.result << " for command " << reply.command << RTT::endlog();
+            RTT::log(RTT::Error) << "Trajectory command returned " << 
+                reply.result << " for command " << reply.command << RTT::endlog();
             exception(TRAJECTORY_CMD_ERROR);
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
     }
 
-    running = false;
-    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
+    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, 
+        msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
         report(TRAJECTORY_END);
 }
+
+
+void WriterTask::updateHook()
+{
+    WriterTaskBase::updateHook();
+
+    switch(state())
+    {
+        case NOT_CHECKED:
+            checkInitialStatus();
+            break;
+        case STATUS_CHECKED: 
+            startTrajectoryMode();
+            break;
+        case MOTION_READY: 
+            readNewTrajectory();
+            break;
+        case TRAJECTORY_EXECUTION: 
+            executeTrajectory();
+            break;
+        default: 
+            stopTrajectory();
+            break;
+    }
+}
+
 void WriterTask::errorHook()
 {
     WriterTaskBase::errorHook();
 }
 void WriterTask::stopHook()
 {
-    while(mDriver->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::STOP_MOTION).result != msgs::motion_reply::MotionReplyResults::SUCCESS){};
+    stopTrajectory();
     mDriver->close();
     WriterTaskBase::stopHook();
 }

@@ -30,10 +30,16 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
 	friend class WriterTaskBase;
     protected:
         void processIO();
+        void sendAndCheckMotionCmd(base::Time const& timeout, int cmd);
+        void checkInitialStatus();
+        void stopTrajectory();
+        void startTrajectoryMode();
+        void readNewTrajectory();
+        void executeTrajectory();
+        
         Driver* mDriver;
         base::JointsTrajectory current_trajectory;
         size_t current_step;
-        bool running;
 
     public:
         /** TaskContext constructor for WriterTask
