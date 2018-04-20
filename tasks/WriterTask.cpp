@@ -125,11 +125,11 @@ void WriterTask::readNewTrajectory()
         return;
     } else if (incoming_data == RTT::NewData)
     {
-        if(!temp_trajectory.isValid())
+        if(!temp_trajectory.isValid() || !temp_trajectory.isTimed())
         {
             exception(INVALID_TRAJECTORY);
             return;
-        } else if (!temp_trajectory.times.empty() && !temp_trajectory.times[0].isNull())
+        } else if (!temp_trajectory.times[0].isNull())
         {
             exception(TRAJECTORY_START_TIME_NON_NULL);
             return;
