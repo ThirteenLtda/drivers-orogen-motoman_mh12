@@ -61,25 +61,25 @@ bool WriterTask::startHook()
 
 void WriterTask::checkInitialStatus()
 {
-   msgs::MotomanStatus status;
-   if(_status.read(status) == RTT::NewData) 
-   {
-        if(status.ln_error != 0)
-        {
-            RTT::log(RTT::Error) << "Alarm with code " << 
-                status.error_code << " is on" << RTT::endlog();
-            exception(ALARM_ERROR);
-            throw std::runtime_error("Alarm on, to enable the robot please reset it"); 
-        }
-        if(status.mode != 0)
-        {
-            RTT::log(RTT::Error) << "Pendant is not on remote mode, please turn key to the correct mode"
-                << RTT::endlog();
-            exception(PENDANT_MODE_ERROR);
-            throw;
-        }
-        state(STATUS_CHECKED);
-   }
+    msgs::MotomanStatus status;
+    if(_status.read(status) != RTT::NewData) 
+        return;
+    
+    if(status.ln_error != 0)
+    {
+        RTT::log(RTT::Error) << "Alarm with code " << 
+            status.error_code << " is on" << RTT::endlog();
+        exception(ALARM_ERROR);
+        throw std::runtime_error("Alarm on, to enable the robot please reset it"); 
+    }
+    if(status.mode != 0)
+    {
+        RTT::log(RTT::Error) << "Pendant is not on remote mode, please turn key to the correct mode"
+            << RTT::endlog();
+        exception(PENDANT_MODE_ERROR);
+        throw;
+    }
+    state(STATUS_CHECKED);
 }
 
 void WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
