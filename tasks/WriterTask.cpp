@@ -33,6 +33,8 @@ bool WriterTask::configureHook()
         driver->openURI(_io_port.get());
     setDriver(driver);
     mDriver = driver;
+    gpios_addresses.resize(_gpios_addresses.get().size());
+    gpios_addresses = _gpios_addresses.get();
 
     if (! WriterTaskBase::configureHook())
         return false;
@@ -64,7 +66,6 @@ void WriterTask::checkInitialStatus()
    {
         if(status.ln_error != 0)
         {
-            exception(ALARM_ERROR);
             RTT::log(RTT::Error) << "Alarm with code " << 
                 status.error_code << " is on" << RTT::endlog();
             exception(ALARM_ERROR);
@@ -171,11 +172,11 @@ void WriterTask::executeTrajectory()
 void WriterTask::readGPIO()
 {
     GPIOs gpios;
-    for(size_t i; i<_gpios_addresses.get().size(); i++)
+    for(size_t i; i < gpios_addresses.size(); i++)
     {
-        msgs::ReadSingleIo single_io = mDriver->queryReadSingleIO(_gpios_addresses.get()[i]);
+        msgs::ReadSingleIo single_io = mDriver->queryReadSingleIO(gpios_addresses[i]);
         GPIO current_gpio;
-        current_gpio.address = _gpios_addresses.get()[i];
+        current_gpio.address = gpios_addresses[i];
         current_gpio.value = single_io.value;
         gpios.ports.push_back(current_gpio);
     }
