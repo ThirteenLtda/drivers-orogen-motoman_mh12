@@ -105,13 +105,34 @@ void WriterTask::stopTrajectory()
 void WriterTask::startTrajectoryMode()
 {
     base::Time timeout = base::Time::fromSeconds(1);
-    sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
+    msgs::MotionReply reply = mDriver
+            ->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
+    if(reply.result == msgs::motion_reply::MotionReplyResult::SUCCESS)
+    {
+        state(CHECK_MOTION_READY);
+        return;
+    }
+    else
+        throw std::runtime_error("The controller could not enter Trajectory mode");
+}
+
+void WriterTask::checkMotionReady()
+{
+    base::Time timeout = base::Time::fromSeconds(1);
+    base::Timeout deadline(timeout);
     msgs::MotomanStatus status;
-   if(_status.read(status) == RTT::NewData) 
-   {
-        if(status.motion_possible == 1 && status.drives_powered == 1)
-            state(MOTION_READY);
-   }
+    while(!deadline.elapsed())
+    {
+        if(_status.read(status) == RTT::NewData) 
+        {
+            if(status.motion_possible == 1 && status.drives_powered == 1)
+            {
+                state(MOTION_READY);
+                return;
+            }
+        }
+    }
+    throw std::runtime_error("The controller could not enter Trajectory mode");
 }
 
 void WriterTask::readNewTrajectory()
@@ -195,6 +216,9 @@ void WriterTask::updateHook()
             break;
         case STATUS_CHECKED: 
             startTrajectoryMode();
+            break;
+        case CHECK_MOTION_READY:
+            checkMotionReady();
             break;
         case MOTION_READY: 
             readNewTrajectory();
