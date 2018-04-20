@@ -3,17 +3,16 @@
 #include "WriterTask.hpp"
 #include <motoman_mh12/Msgs.hpp>
 #include <iodrivers_base/ConfigureGuard.hpp>
-#include <base/Timeout.hpp>
 
 using namespace motoman_mh12;
 
 WriterTask::WriterTask(std::string const& name)
-    : WriterTaskBase(name)
+    : WriterTaskBase(name), start_trajectory_deadline(base::Time::fromSeconds(2))
 {
 }
 
 WriterTask::WriterTask(std::string const& name, RTT::ExecutionEngine* engine)
-    : WriterTaskBase(name, engine)
+    : WriterTaskBase(name, engine), start_trajectory_deadline(base::Time::fromSeconds(2))
 {
 }
 
@@ -109,6 +108,7 @@ void WriterTask::startTrajectoryMode()
             ->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
     if(reply.result == msgs::motion_reply::MotionReplyResult::SUCCESS)
     {
+        start_trajectory_deadline.restart();
         state(CHECK_MOTION_READY);
         return;
     }
@@ -118,10 +118,8 @@ void WriterTask::startTrajectoryMode()
 
 void WriterTask::checkMotionReady()
 {
-    base::Time timeout = base::Time::fromSeconds(1);
-    base::Timeout deadline(timeout);
     msgs::MotomanStatus status;
-    while(!deadline.elapsed())
+    if(!start_trajectory_deadline.elapsed())
     {
         if(_status.read(status) == RTT::NewData) 
         {
@@ -132,7 +130,8 @@ void WriterTask::checkMotionReady()
             }
         }
     }
-    throw std::runtime_error("The controller could not enter Trajectory mode");
+    else
+        throw std::runtime_error("The controller could not enter Trajectory mode");
 }
 
 void WriterTask::readNewTrajectory()

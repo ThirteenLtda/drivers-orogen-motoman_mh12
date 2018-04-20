@@ -5,6 +5,7 @@
 
 #include "motoman_mh12/WriterTaskBase.hpp"
 #include <motoman_mh12/Driver.hpp>
+#include <base/Timeout.hpp>
 
 namespace motoman_mh12{
 
@@ -43,6 +44,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
         base::JointsTrajectory current_trajectory;
         std::vector<int> gpios_addresses;
         size_t current_step;
+        base::Timeout start_trajectory_deadline;
 
     public:
         /** TaskContext constructor for WriterTask
