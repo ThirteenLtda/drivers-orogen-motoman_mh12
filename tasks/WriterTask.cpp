@@ -37,7 +37,7 @@ bool WriterTask::configureHook()
 
     if (! WriterTaskBase::configureHook())
         return false;
-    
+
     guard.commit();
     return true;
 }
@@ -61,15 +61,15 @@ bool WriterTask::startHook()
 void WriterTask::checkInitialStatus()
 {
     msgs::MotomanStatus status;
-    if(_status.read(status) != RTT::NewData) 
+    if(_status.read(status) != RTT::NewData)
         return;
-    
+
     if(status.ln_error != 0)
     {
-        RTT::log(RTT::Error) << "Alarm with code " << 
+        RTT::log(RTT::Error) << "Alarm with code " <<
             status.error_code << " is on" << RTT::endlog();
         exception(ALARM_ERROR);
-        throw std::runtime_error("Alarm on, to enable the robot please reset it"); 
+        throw std::runtime_error("Alarm on, to enable the robot please reset it");
     }
     if(status.mode != 0)
     {
@@ -81,7 +81,7 @@ void WriterTask::checkInitialStatus()
     state(STATUS_CHECKED);
 }
 
-void WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
+bool WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
 {
     base::Timeout deadline(timeout);
     while(!deadline.elapsed())
@@ -89,16 +89,24 @@ void WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
         msgs::MotionReply stop_reply = mDriver
             ->sendMotionCtrl(0, 0, cmd);
         if(stop_reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS)
-            return;
-    }            
+            return true;
+        RTT::log(RTT::Warning) << "Command #" << cmd << " was not sent properly"
+            << RTT::endlog();
+    }
+    return false;
 }
 
 void WriterTask::stopTrajectory()
 {
     base::Time timeout = base::Time::fromSeconds(1);
-    sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_MOTION);
-    sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_TRAJ_MODE);
-    state(NOT_CHECKED);
+    bool stop_motion
+        = sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_MOTION);
+    bool stop_traj_mode =
+        sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_TRAJ_MODE);
+    if(stop_motion && stop_traj_mode)
+        state(NOT_CHECKED);
+    else
+        exception(TRAJECTORY_END_ERROR);
 }
 
 void WriterTask::startTrajectoryMode()
@@ -121,7 +129,7 @@ void WriterTask::checkMotionReady()
     msgs::MotomanStatus status;
     if(!start_trajectory_deadline.elapsed())
     {
-        if(_status.read(status) == RTT::NewData) 
+        if(_status.read(status) == RTT::NewData)
         {
             if(status.motion_possible == 1 && status.drives_powered == 1)
             {
@@ -141,7 +149,7 @@ void WriterTask::readNewTrajectory()
 
     if(incoming_data == RTT::NoData)
     {
-        stopTrajectory(); 
+        stopTrajectory();
         return;
     } else if (incoming_data == RTT::NewData)
     {
@@ -176,14 +184,14 @@ void WriterTask::executeTrajectory()
 
         if(reply.result != msgs::motion_reply::MotionReplyResults::SUCCESS)
         {
-            RTT::log(RTT::Error) << "Trajectory command returned " << 
+            RTT::log(RTT::Error) << "Trajectory command returned " <<
                 reply.result << " for command " << reply.command << RTT::endlog();
             exception(TRAJECTORY_CMD_ERROR);
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
     }
 
-    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0, 
+    msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0,
         msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
         report(TRAJECTORY_END);
@@ -213,19 +221,19 @@ void WriterTask::updateHook()
         case NOT_CHECKED:
             checkInitialStatus();
             break;
-        case STATUS_CHECKED: 
+        case STATUS_CHECKED:
             startTrajectoryMode();
             break;
         case CHECK_MOTION_READY:
             checkMotionReady();
             break;
-        case MOTION_READY: 
+        case MOTION_READY:
             readNewTrajectory();
             break;
-        case TRAJECTORY_EXECUTION: 
+        case TRAJECTORY_EXECUTION:
             executeTrajectory();
             break;
-        default: 
+        default:
             stopTrajectory();
             break;
     }

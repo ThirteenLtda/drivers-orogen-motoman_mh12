@@ -31,7 +31,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
 	friend class WriterTaskBase;
     protected:
         void processIO();
-        void sendAndCheckMotionCmd(base::Time const& timeout, int cmd);
+        bool sendAndCheckMotionCmd(base::Time const& timeout, int cmd);
         void checkInitialStatus();
         void checkMotionReady();
         void stopTrajectory();
@@ -39,7 +39,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
         void readNewTrajectory();
         void executeTrajectory();
         void readGPIO();
-        
+
         Driver* mDriver;
         base::JointsTrajectory current_trajectory;
         std::vector<int> gpios_addresses;
@@ -56,7 +56,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
         /** TaskContext constructor for WriterTask
          * \param name Name of the task. This name needs to be unique to make it identifiable for nameservices.
          * \param engine The RTT Execution engine to be used for this task, which serialises the execution of all commands, programs, state machines and incoming events for a task.
-         * 
+         *
          */
         WriterTask(std::string const& name, RTT::ExecutionEngine* engine);
 
