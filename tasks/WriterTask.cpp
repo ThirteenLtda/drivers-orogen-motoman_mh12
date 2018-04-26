@@ -120,11 +120,9 @@ void WriterTask::stopTrajectory()
 
 void WriterTask::startTrajectoryMode()
 {
-    msgs::MotionReply reply = mDriver
-            ->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
-    if(reply.result == msgs::motion_reply::MotionReplyResult::SUCCESS)
+    base::Time timeout = base::Time::fromSeconds(1);
+    if(sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE))
     {
-        start_trajectory_deadline.restart();
         state(CHECK_MOTION_READY);
         return;
     }
@@ -135,13 +133,15 @@ void WriterTask::startTrajectoryMode()
 void WriterTask::checkMotionReady()
 {
     msgs::MotomanStatus status;
+    startTrajectoryMode();
+    start_trajectory_deadline.restart();
     if(!start_trajectory_deadline.elapsed())
     {
         if(_status.read(status) == RTT::NewData)
         {
             if(!status.motion_possible && status.drives_powered)
             {
-                state(MOTION_READY);
+                state(TRAJECTORY_EXECUTION);
                 return;
             }
         }
@@ -155,11 +155,7 @@ void WriterTask::readNewTrajectory()
     base::JointsTrajectory temp_trajectory;
     RTT::FlowStatus incoming_data = _trajectory.read(temp_trajectory);
 
-    if(incoming_data == RTT::NoData)
-    {
-        stopTrajectory();
-        return;
-    } else if (incoming_data == RTT::NewData)
+    if (incoming_data == RTT::NewData)
     {
         if(!temp_trajectory.isValid() || !temp_trajectory.isTimed())
         {
@@ -172,7 +168,7 @@ void WriterTask::readNewTrajectory()
         }
         current_trajectory = temp_trajectory;
         current_step = 0;
-        state(TRAJECTORY_EXECUTION);
+        state(CHECK_MOTION_READY);
     }
 }
 
@@ -201,7 +197,10 @@ void WriterTask::executeTrajectory()
     msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0,
         msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
+    {
         report(TRAJECTORY_END);
+        stopTrajectory();
+    }
 }
 
 void WriterTask::readGPIO()
@@ -231,13 +230,10 @@ void WriterTask::updateHook()
             checkInitialStatus();
             break;
         case STATUS_CHECKED:
-            startTrajectoryMode();
+            readNewTrajectory();
             break;
         case CHECK_MOTION_READY:
             checkMotionReady();
-            break;
-        case MOTION_READY:
-            readNewTrajectory();
             break;
         case TRAJECTORY_EXECUTION:
             executeTrajectory();
