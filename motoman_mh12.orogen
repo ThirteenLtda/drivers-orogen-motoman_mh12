@@ -67,11 +67,14 @@ task_context "WriterTask", subclasses: "iodrivers_base::Task" do
     # There is at least one alarm on
     exception_states :ALARM_ERROR
 
+    exception_states :PANIC_BUTTON_ERROR
+
     # Pedant is not on remote mode
     exception_states :PENDANT_MODE_ERROR
 
     reports :TRAJECTORY_END
-    runtime_states  :NOT_CHECKED,:STATUS_CHECKED, :CHECK_MOTION_READY, :MOTION_READY, :TRAJECTORY_EXECUTION
+    runtime_states  :NOT_CHECKED,:STATUS_CHECKED, :CHECK_MOTION_READY, :TRAJECTORY_EXECUTION,
+        :CHECK_TRAJECTORY_END
 
     periodic 0.1
 end

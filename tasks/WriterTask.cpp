@@ -62,21 +62,30 @@ void WriterTask::checkInitialStatus()
 {
     msgs::MotomanStatus status;
     if(_status.read(status) != RTT::NewData)
+    {
         return;
+    }
 
-    if(status.ln_error != 0)
+    if(status.e_stopped)
+    {
+        RTT::log(RTT::Error) << "Panic Button is pressed, release it before continuing"
+            << RTT::endlog();
+        exception(PANIC_BUTTON_ERROR);
+        throw std::runtime_error("Panic Button is pressed, release it before continuing");
+    }
+    if(status.ln_error)
     {
         RTT::log(RTT::Error) << "Alarm with code " <<
             status.error_code << " is on" << RTT::endlog();
         exception(ALARM_ERROR);
         throw std::runtime_error("Alarm on, to enable the robot please reset it");
     }
-    if(status.mode != 0)
+    if(!status.mode)
     {
         RTT::log(RTT::Error) << "Pendant is not on remote mode, please turn key to the correct mode"
             << RTT::endlog();
         exception(PENDANT_MODE_ERROR);
-        throw;
+        throw std::runtime_error("Pendant is not on remote mode, please turn key to the correct mode");
     }
     state(STATUS_CHECKED);
 }
@@ -112,11 +121,8 @@ void WriterTask::stopTrajectory()
 void WriterTask::startTrajectoryMode()
 {
     base::Time timeout = base::Time::fromSeconds(1);
-    msgs::MotionReply reply = mDriver
-            ->sendMotionCtrl(0, 0, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE);
-    if(reply.result == msgs::motion_reply::MotionReplyResult::SUCCESS)
+    if(sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE))
     {
-        start_trajectory_deadline.restart();
         state(CHECK_MOTION_READY);
         return;
     }
@@ -127,13 +133,15 @@ void WriterTask::startTrajectoryMode()
 void WriterTask::checkMotionReady()
 {
     msgs::MotomanStatus status;
+    startTrajectoryMode();
+    start_trajectory_deadline.restart();
     if(!start_trajectory_deadline.elapsed())
     {
         if(_status.read(status) == RTT::NewData)
         {
-            if(status.motion_possible == 1 && status.drives_powered == 1)
+            if(status.motion_possible && status.drives_powered)
             {
-                state(MOTION_READY);
+                state(TRAJECTORY_EXECUTION);
                 return;
             }
         }
@@ -147,11 +155,7 @@ void WriterTask::readNewTrajectory()
     base::JointsTrajectory temp_trajectory;
     RTT::FlowStatus incoming_data = _trajectory.read(temp_trajectory);
 
-    if(incoming_data == RTT::NoData)
-    {
-        stopTrajectory();
-        return;
-    } else if (incoming_data == RTT::NewData)
+    if (incoming_data == RTT::NewData)
     {
         if(!temp_trajectory.isValid() || !temp_trajectory.isTimed())
         {
@@ -163,9 +167,8 @@ void WriterTask::readNewTrajectory()
             return;
         }
         current_trajectory = temp_trajectory;
-        startTrajectoryMode();
         current_step = 0;
-        state(TRAJECTORY_EXECUTION);
+        state(CHECK_MOTION_READY);
     }
 }
 
@@ -190,16 +193,26 @@ void WriterTask::executeTrajectory()
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
     }
+    usleep(1000);
+    state(CHECK_TRAJECTORY_END);
+}
 
+void WriterTask::checkTrajectoryEnd()
+{
     msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0,
         msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
+
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
-        report(TRAJECTORY_END);
+    {
+        state(STATUS_CHECKED);
+    }
 }
 
 void WriterTask::readGPIO()
 {
     GPIOs gpios;
+    if(gpios_addresses.size() <= 0)
+        return;
     for(size_t i; i < gpios_addresses.size(); i++)
     {
         msgs::ReadSingleIo single_io = mDriver->queryReadSingleIO(gpios_addresses[i]);
@@ -222,16 +235,16 @@ void WriterTask::updateHook()
             checkInitialStatus();
             break;
         case STATUS_CHECKED:
-            startTrajectoryMode();
+            readNewTrajectory();
             break;
         case CHECK_MOTION_READY:
             checkMotionReady();
             break;
-        case MOTION_READY:
-            readNewTrajectory();
-            break;
         case TRAJECTORY_EXECUTION:
             executeTrajectory();
+            break;
+        case CHECK_TRAJECTORY_END:
+            checkTrajectoryEnd();
             break;
         default:
             stopTrajectory();
