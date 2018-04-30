@@ -70,7 +70,7 @@ void WriterTask::checkInitialStatus()
     {
         RTT::log(RTT::Error) << "Panic Button is pressed, release it before continuing"
             << RTT::endlog();
-        exception(ALARM_ERROR);
+        exception(PANIC_BUTTON_ERROR);
         throw std::runtime_error("Panic Button is pressed, release it before continuing");
     }
     if(status.ln_error)

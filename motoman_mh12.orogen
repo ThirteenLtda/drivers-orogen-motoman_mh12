@@ -67,6 +67,8 @@ task_context "WriterTask", subclasses: "iodrivers_base::Task" do
     # There is at least one alarm on
     exception_states :ALARM_ERROR
 
+    exception_states :PANIC_BUTTON_ERROR
+
     # Pedant is not on remote mode
     exception_states :PENDANT_MODE_ERROR
 
