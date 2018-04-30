@@ -139,7 +139,7 @@ void WriterTask::checkMotionReady()
     {
         if(_status.read(status) == RTT::NewData)
         {
-            if(!status.motion_possible && status.drives_powered)
+            if(status.motion_possible && status.drives_powered)
             {
                 state(TRAJECTORY_EXECUTION);
                 return;
@@ -193,13 +193,18 @@ void WriterTask::executeTrajectory()
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
     }
+    usleep(1000);
+    state(CHECK_TRAJECTORY_END);
+}
 
+void WriterTask::checkTrajectoryEnd()
+{
     msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0,
         msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
+
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
     {
-        report(TRAJECTORY_END);
-        stopTrajectory();
+        state(STATUS_CHECKED);
     }
 }
 
@@ -237,6 +242,9 @@ void WriterTask::updateHook()
             break;
         case TRAJECTORY_EXECUTION:
             executeTrajectory();
+            break;
+        case CHECK_TRAJECTORY_END:
+            checkTrajectoryEnd();
             break;
         default:
             stopTrajectory();

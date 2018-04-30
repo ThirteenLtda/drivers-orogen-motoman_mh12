@@ -38,6 +38,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
         void startTrajectoryMode();
         void readNewTrajectory();
         void executeTrajectory();
+        void checkTrajectoryEnd();
         void readGPIO();
 
         Driver* mDriver;
