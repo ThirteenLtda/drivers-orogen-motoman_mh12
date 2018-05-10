@@ -87,7 +87,6 @@ void WriterTask::checkInitialStatus()
         exception(PENDANT_MODE_ERROR);
         throw std::runtime_error("Pendant is not on remote mode, please turn key to the correct mode");
     }
-    state(STATUS_CHECKED);
 }
 
 bool WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
@@ -204,6 +203,7 @@ void WriterTask::checkTrajectoryEnd()
 
     if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
     {
+        state(TRAJECTORY_END);
         state(STATUS_CHECKED);
     }
 }
@@ -228,11 +228,13 @@ void WriterTask::readGPIO()
 void WriterTask::updateHook()
 {
     WriterTaskBase::updateHook();
+    checkInitialStatus();
 
     switch(state())
     {
         case NOT_CHECKED:
             checkInitialStatus();
+            state(STATUS_CHECKED);
             break;
         case STATUS_CHECKED:
             readNewTrajectory();
