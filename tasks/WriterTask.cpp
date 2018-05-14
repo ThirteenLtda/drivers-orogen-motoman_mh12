@@ -58,12 +58,12 @@ bool WriterTask::startHook()
     return true;
 }
 
-void WriterTask::checkInitialStatus()
+bool WriterTask::checkInitialStatus()
 {
     msgs::MotomanStatus status;
     if(_status.read(status) != RTT::NewData)
     {
-        return;
+        return false;
     }
 
     if(status.e_stopped)
@@ -87,7 +87,7 @@ void WriterTask::checkInitialStatus()
         exception(PENDANT_MODE_ERROR);
         throw std::runtime_error("Pendant is not on remote mode, please turn key to the correct mode");
     }
-    state(STATUS_CHECKED);
+    return true;
 }
 
 bool WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
@@ -105,74 +105,58 @@ bool WriterTask::sendAndCheckMotionCmd(base::Time const& timeout, int cmd)
     return false;
 }
 
-void WriterTask::stopTrajectory()
+bool WriterTask::stopTrajectory()
 {
     base::Time timeout = base::Time::fromSeconds(1);
     bool stop_motion
         = sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_MOTION);
     bool stop_traj_mode =
         sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::STOP_TRAJ_MODE);
-    if(stop_motion && stop_traj_mode)
-        state(NOT_CHECKED);
-    else
-        exception(TRAJECTORY_END_ERROR);
+    return stop_motion && stop_traj_mode;
 }
 
 void WriterTask::startTrajectoryMode()
 {
     base::Time timeout = base::Time::fromSeconds(1);
-    if(sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE))
-    {
-        state(CHECK_MOTION_READY);
-        return;
-    }
-    else
+    if(!sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE))
         throw std::runtime_error("The controller could not enter Trajectory mode");
 }
 
-void WriterTask::checkMotionReady()
+bool WriterTask::checkMotionReady()
 {
     msgs::MotomanStatus status;
-    startTrajectoryMode();
-    start_trajectory_deadline.restart();
-    if(!start_trajectory_deadline.elapsed())
-    {
-        if(_status.read(status) == RTT::NewData)
-        {
-            if(status.motion_possible && status.drives_powered)
-            {
-                state(TRAJECTORY_EXECUTION);
-                return;
-            }
-        }
-    }
-    else
+    if (start_trajectory_deadline.elapsed())
         throw std::runtime_error("The controller could not enter Trajectory mode");
+    else if (_status.read(status) != RTT::NewData)
+        return false;
+    else if (status.motion_possible && status.drives_powered)
+        return true;
 }
 
-void WriterTask::readNewTrajectory()
+bool WriterTask::readNewTrajectory()
 {
     base::JointsTrajectory temp_trajectory;
     RTT::FlowStatus incoming_data = _trajectory.read(temp_trajectory);
 
-    if (incoming_data == RTT::NewData)
+    if (incoming_data != RTT::NewData)
+        return false;
+
+    if(!temp_trajectory.isValid() || !temp_trajectory.isTimed())
     {
-        if(!temp_trajectory.isValid() || !temp_trajectory.isTimed())
-        {
-            exception(INVALID_TRAJECTORY);
-            return;
-        } else if (!temp_trajectory.times[0].isNull())
-        {
-            exception(TRAJECTORY_START_TIME_NON_NULL);
-            return;
-        }
-        current_trajectory = temp_trajectory;
-        current_step = 0;
-        state(CHECK_MOTION_READY);
+        exception(INVALID_TRAJECTORY);
+        return false;
     }
+    else if (!temp_trajectory.times[0].isNull())
+    {
+        exception(TRAJECTORY_START_TIME_NON_NULL);
+        return false;
+    }
+    current_trajectory = temp_trajectory;
+    current_step = 0;
+    return true;
 }
 
-void WriterTask::executeTrajectory()
+bool WriterTask::executeTrajectory()
 {
     base::samples::Joints joints;
     for(; current_step < current_trajectory.getTimeSteps(); current_step++)
@@ -182,7 +166,7 @@ void WriterTask::executeTrajectory()
         msgs::MotionReply reply = mDriver->sendJointTrajPTFullCmd(0, current_step, joints);
         if (reply.result == msgs::motion_reply::MotionReplyResults::BUSY)
         {
-            return;
+            return false;
         }
 
         if(reply.result != msgs::motion_reply::MotionReplyResults::SUCCESS)
@@ -193,19 +177,16 @@ void WriterTask::executeTrajectory()
             throw std::runtime_error("Trajectory command was not SUCCESS nor BUSY.");
         }
     }
-    usleep(1000);
-    state(CHECK_TRAJECTORY_END);
+    return true;
 }
 
-void WriterTask::checkTrajectoryEnd()
+bool WriterTask::checkTrajectoryEnd()
 {
     msgs::MotionReply reply = mDriver->sendMotionCtrl(0, 0,
         msgs::motion_ctrl::MotionControlCmds::CHECK_QUEUE_CNT);
 
-    if(reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS && reply.subcode == 0)
-    {
-        state(STATUS_CHECKED);
-    }
+    return reply.result == msgs::motion_reply::MotionReplyResults::SUCCESS &&
+        reply.subcode == 0;
 }
 
 void WriterTask::readGPIO()
@@ -229,25 +210,43 @@ void WriterTask::updateHook()
 {
     WriterTaskBase::updateHook();
 
+    bool checked = checkInitialStatus();
+
     switch(state())
     {
         case NOT_CHECKED:
-            checkInitialStatus();
+            if (checked)
+                state(STATUS_CHECKED);
             break;
         case STATUS_CHECKED:
-            readNewTrajectory();
+            if (readNewTrajectory())
+                state(CHECK_MOTION_READY);
             break;
         case CHECK_MOTION_READY:
-            checkMotionReady();
+            startTrajectoryMode();
+            if (checkMotionReady())
+                state(TRAJECTORY_EXECUTION);
             break;
         case TRAJECTORY_EXECUTION:
-            executeTrajectory();
+            if (executeTrajectory())
+            {
+                // Need to wait for the queue count to be updated
+                usleep(1000);
+                state(CHECK_TRAJECTORY_END);
+            }
             break;
         case CHECK_TRAJECTORY_END:
-            checkTrajectoryEnd();
+            if (checkTrajectoryEnd())
+            {
+                state(TRAJECTORY_END);
+                state(STATUS_CHECKED);
+            }
             break;
         default:
-            stopTrajectory();
+            if (stopTrajectory())
+                state(NOT_CHECKED);
+            else
+                exception(TRAJECTORY_END_ERROR);
             break;
     }
     readGPIO();
