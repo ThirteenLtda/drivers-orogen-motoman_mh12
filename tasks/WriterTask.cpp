@@ -128,7 +128,8 @@ bool WriterTask::checkMotionReady()
     if (_status.read(status) != RTT::NewData)
     {
         return false;
-    else if (status.motion_possible && status.drives_powered)
+    }
+    else if (status.drives_powered)
         return true;
 }
 
