@@ -125,9 +125,8 @@ void WriterTask::startTrajectoryMode()
 bool WriterTask::checkMotionReady()
 {
     msgs::MotomanStatus status;
-    if (start_trajectory_deadline.elapsed())
-        throw std::runtime_error("The controller could not enter Trajectory mode");
-    else if (_status.read(status) != RTT::NewData)
+    if (_status.read(status) != RTT::NewData)
+    {
         return false;
     else if (status.motion_possible && status.drives_powered)
         return true;
