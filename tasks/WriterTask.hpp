@@ -32,8 +32,7 @@ tasks/Task.cpp, and will be put in the motoman_mh12 namespace.
     protected:
         void processIO();
         bool sendAndCheckMotionCmd(base::Time const& timeout, int cmd);
-        bool checkInitialStatus();
-        bool checkMotionReady();
+        bool checkInitialStatus(msgs::MotomanStatus& status);
         bool stopTrajectory();
         void startTrajectoryMode();
         bool readNewTrajectory();

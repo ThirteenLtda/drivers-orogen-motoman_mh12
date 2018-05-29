@@ -58,14 +58,8 @@ bool WriterTask::startHook()
     return true;
 }
 
-bool WriterTask::checkInitialStatus()
+bool WriterTask::checkInitialStatus(msgs::MotomanStatus& status)
 {
-    msgs::MotomanStatus status;
-    if(_status.read(status) != RTT::NewData)
-    {
-        return false;
-    }
-
     if(status.e_stopped)
     {
         RTT::log(RTT::Error) << "Panic Button is pressed, release it before continuing"
@@ -117,20 +111,9 @@ bool WriterTask::stopTrajectory()
 
 void WriterTask::startTrajectoryMode()
 {
-    base::Time timeout = base::Time::fromSeconds(1);
+    base::Time timeout = base::Time::fromSeconds(2);
     if(!sendAndCheckMotionCmd(timeout, msgs::motion_ctrl::MotionControlCmds::START_TRAJ_MODE))
         throw std::runtime_error("The controller could not enter Trajectory mode");
-}
-
-bool WriterTask::checkMotionReady()
-{
-    msgs::MotomanStatus status;
-    if (start_trajectory_deadline.elapsed())
-        throw std::runtime_error("The controller could not enter Trajectory mode");
-    else if (_status.read(status) != RTT::NewData)
-        return false;
-    else if (status.motion_possible && status.drives_powered)
-        return true;
 }
 
 bool WriterTask::readNewTrajectory()
@@ -210,7 +193,12 @@ void WriterTask::updateHook()
 {
     WriterTaskBase::updateHook();
 
-    bool checked = checkInitialStatus();
+    msgs::MotomanStatus status;
+    bool hasNewStatus = (_status.read(status) == RTT::NewData);
+
+    bool checked = false;
+    if (hasNewStatus)
+        checkInitialStatus(status);
 
     switch(state())
     {
@@ -224,7 +212,7 @@ void WriterTask::updateHook()
             break;
         case CHECK_MOTION_READY:
             startTrajectoryMode();
-            if (checkMotionReady())
+            if (hasNewStatus && status.drives_powered)
                 state(TRAJECTORY_EXECUTION);
             break;
         case TRAJECTORY_EXECUTION:
