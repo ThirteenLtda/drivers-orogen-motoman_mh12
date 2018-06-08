@@ -198,7 +198,10 @@ void WriterTask::updateHook()
 
     bool checked = false;
     if (hasNewStatus)
+    {
         checkInitialStatus(status);
+        checked = true;
+    }
 
     switch(state())
     {
